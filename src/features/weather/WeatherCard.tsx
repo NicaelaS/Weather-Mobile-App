@@ -1,91 +1,119 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { spacing } from '@/styles/spacing'
+import { useNavigation } from '@react-navigation/native'
+import {
+    Alert,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native'
+import { useFavoritesContext } from '../../app/providers/FavoritesProvider'
+import { colors } from '../../styles/colors'
+import formatTempBoth from '../../utils/formatTemperature'
 
-import { colors } from '@/styles/colors';
-import { spacing } from '@/styles/spacing';
-import { formatTemperature } from '@/utils/formatTemperature';
+interface WeatherCardProps {
+  city: string
+  temperature: number | undefined
+  icon: string | undefined
+}
 
-type WeatherCardProps = {
-  id: string;
-  city: string;
-  condition: string;
-  temperature: number;
-  isFavorite?: boolean;
-  onPress?: () => void;
-  onToggleFavorite?: () => void;
-};
+export function WeatherCard({ city, temperature, icon }: WeatherCardProps) {
+  const navigation = useNavigation<any>()
+  const { addFavorite, removeFavorite, isFavorite } = useFavoritesContext()
+  const favorited = isFavorite(city)
 
-export function WeatherCard({
-  id,
-  city,
-  condition,
-  temperature,
-  isFavorite = false,
-  onPress,
-  onToggleFavorite,
-}: WeatherCardProps) {
+  const iconUrl = icon
+    ? `https://openweathermap.org/img/wn/${icon}@4x.png`
+    : null
+
+  const handlePress = () => {
+    navigation.navigate('WeatherDetail', { city })
+  }
+
+  const handleToggleFavorite = () => {
+    if (favorited) {
+      removeFavorite(city)
+    } else {
+      addFavorite(city)
+      Alert.alert('Success', `${city} added to favorites!`)
+    }
+  }
+
   return (
-    <Pressable onPress={onPress} style={styles.card}>
-      <View style={styles.row}>
-        <View>
-          <Text style={styles.location}>{city}</Text>
-          <Text style={styles.condition}>{condition}</Text>
-        </View>
-        <Pressable onPress={onToggleFavorite} style={styles.favoriteButton} hitSlop={8}>
-          <Text style={styles.favoriteText}>{isFavorite ? '★' : '☆'}</Text>
-        </Pressable>
+    <TouchableOpacity style={styles.card} onPress={handlePress}>
+      <View style={styles.iconContainer}>
+        {iconUrl ? (
+          <Image source={{ uri: iconUrl }} style={styles.icon} />
+        ) : (
+          <Text style={styles.fallbackIcon}>☀️</Text>
+        )}
       </View>
 
-      <Text style={styles.temp}>{formatTemperature(temperature)}</Text>
-      <Text style={styles.meta}>City ID: {id}</Text>
-    </Pressable>
-  );
+      <View style={styles.body}>
+        <Text style={styles.city}>{city}</Text>
+        <Text style={styles.temperature}>
+          {typeof temperature === 'number'
+            ? formatTempBoth(temperature)
+            : 'Loading...'}
+        </Text>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.favoriteButton, favorited && styles.favoriteButtonActive]}
+        onPress={handleToggleFavorite}
+      >
+        <Text style={styles.favoriteButtonText}>
+          {favorited ? '★' : '☆'}
+        </Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  )
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
-  },
-  row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  location: {
+  iconContainer: {
+    marginRight: spacing.md,
+  },
+  icon: {
+    width: 60,
+    height: 60,
+  },
+  fallbackIcon: {
+    fontSize: 48,
+  },
+  body: {
+    flex: 1,
+  },
+  city: {
+    fontSize: 16,
+    fontWeight: '600',
     color: colors.text,
-    fontSize: 24,
-    fontWeight: '700',
+    marginBottom: spacing.xs,
   },
-  condition: {
-    color: colors.textMuted,
+  temperature: {
     fontSize: 14,
-    marginTop: spacing.xs,
+    color: colors.textSecondary,
   },
   favoriteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
-  favoriteText: {
-    color: colors.warning,
-    fontSize: 18,
+  favoriteButtonActive: {
+    backgroundColor: colors.secondary,
+    borderRadius: 4,
   },
-  temp: {
-    color: colors.text,
-    fontSize: 42,
-    fontWeight: '700',
-    marginTop: spacing.md,
+  favoriteButtonText: {
+    fontSize: 20,
   },
-  meta: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: spacing.sm,
-  },
-});
+})
