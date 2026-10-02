@@ -1,37 +1,56 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { colors } from '../../styles/colors'
+import { spacing } from '../../styles/spacing'
 
-import { colors } from '@/styles/colors';
-import { spacing } from '@/styles/spacing';
+interface ErrorStateProps {
+  title: string
+  message: string
+  onRetry?: () => void
+}
 
-type ErrorStateProps = {
-  message?: string;
-};
-
-export function ErrorState({ message = 'Something went wrong.' }: ErrorStateProps) {
+export function ErrorState({ title, message, onRetry }: ErrorStateProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Error</Text>
+      <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
+      {onRetry && (
+        <TouchableOpacity style={styles.button} onPress={onRetry}>
+          <Text style={styles.buttonText}>Try Again</Text>
+        </TouchableOpacity>
+      )}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: spacing.xl,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.danger,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
   },
   title: {
-    color: colors.danger,
     fontSize: 18,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
+    fontWeight: '600',
+    color: colors.error,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   message: {
-    color: colors.text,
     fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
   },
-});
+  button: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+})
