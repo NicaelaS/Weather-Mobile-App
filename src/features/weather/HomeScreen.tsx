@@ -1,85 +1,108 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { spacing } from '@/styles/spacing'
+import { useFocusEffect } from '@react-navigation/native'
+import React, { useState } from 'react'
+import { ScrollView, StyleSheet, View } from 'react-native'
+import { getWeatherByCity } from '../../services/weatherapi'
+import { colors } from '../../styles/colors'
+import { EmptyState } from '../layout/EmptyState'
+import { ErrorState } from '../layout/ErrorState'
+import { Header } from '../layout/Header'
+import { LoadingState } from '../layout/LoadingState'
+import { WeatherCard } from './WeatherCard'
 
-import { Header } from '@/features/layout/Header';
-import { ForecastList } from '@/features/weather/ForecastList';
-import { WeatherCard } from '@/features/weather/WeatherCard';
-import { useFavorites } from '@/hooks/useFavorites';
-import { fetchWeatherByCity, type WeatherForecast } from '@/services/weatherapi';
-import { colors } from '@/styles/colors';
-import { spacing } from '@/styles/spacing';
+const DEFAULT_CITIES = ['Seattle', 'Tokyo', 'Paris', 'London', 'New York', 'Berlin']
+
+interface WeatherEntry {
+  city: string
+  temperature: number | undefined
+  icon: string | undefined
+}
 
 export function HomeScreen() {
-  const [weather, setWeather] = useState<WeatherForecast | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const { isFavorite, toggleFavorite } = useFavorites();
+  const [weatherData, setWeatherData] = useState<WeatherEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let active = true;
+  useFocusEffect(
+    React.useCallback(() => {
+      loadWeather()
+    }, [])
+  )
 
-    fetchWeatherByCity('San Diego')
-      .then((data) => {
-        if (active) {
-          setWeather(data);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setError('Unable to load weather data.');
-        }
-      });
+  const loadWeather = async () => {
+    try {
+      setLoading(true)
+      setError(null)
 
-    return () => {
-      active = false;
-    };
-  }, []);
+      const results = await Promise.all(
+        DEFAULT_CITIES.map(async (city) => {
+          try {
+            const data = await getWeatherByCity(city)
+            return {
+              city: data.name || city,
+              temperature: data.main?.temp,
+              icon: data.weather?.[0]?.icon,
+            }
+          } catch (err) {
+            console.warn(`Failed to load weather for ${city}`, err)
+            return {
+              city,
+              temperature: undefined,
+              icon: undefined,
+            }
+          }
+        })
+      )
+
+      setWeatherData(results)
+    } catch (err: any) {
+      console.error('Failed to load weather data', err)
+      setError(err.message || 'Failed to load weather data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <>
+        <Header title="Weather" subtitle="Browse current weather for your favorite cities" />
+        <LoadingState message="Loading weather..." />
+      </>
+    )
+  }
+
+  if (error) {
+    return (
+      <>
+        <Header title="Weather" subtitle="Browse current weather for your favorite cities" />
+        <ErrorState title="Error" message={error} onRetry={loadWeather} />
+      </>
+    )
+  }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Header title="Weather" subtitle="Daily overview" />
-
-      {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : null}
-
-      {!weather ? (
-        <View style={styles.loadingBox}>
-          <Text style={styles.loadingText}>Loading weather…</Text>
-        </View>
-      ) : (
-        <>
-          <WeatherCard
-            id={weather.id}
-            city={weather.city}
-            condition={weather.condition}
-            temperature={weather.temperature}
-            isFavorite={isFavorite(weather.id)}
-            onToggleFavorite={() => toggleFavorite(weather.id)}
+    <View style={styles.container}>
+      <Header title="Weather" subtitle="Browse current weather for your favorite cities" />
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+        {weatherData.length === 0 ? (
+          <EmptyState
+            title="No Data"
+            message="Unable to load weather data for default cities"
           />
-
-          <View style={styles.summary}>
-            <Text style={styles.summaryLabel}>Feels like</Text>
-            <Text style={styles.summaryValue}>{weather.feelsLike}°C</Text>
-          </View>
-
-          <View style={styles.metaGrid}>
-            <View style={styles.metaBox}>
-              <Text style={styles.metaLabel}>Humidity</Text>
-              <Text style={styles.metaValue}>{weather.humidity}%</Text>
-            </View>
-            <View style={styles.metaBox}>
-              <Text style={styles.metaLabel}>Wind</Text>
-              <Text style={styles.metaValue}>{weather.wind} km/h</Text>
-            </View>
-          </View>
-
-          <ForecastList forecasts={weather.hourly} />
-        </>
-      )}
-    </ScrollView>
-  );
+        ) : (
+          weatherData.map((entry) => (
+            <WeatherCard
+              key={entry.city}
+              city={entry.city}
+              temperature={entry.temperature}
+              icon={entry.icon}
+            />
+          ))
+        )}
+      </ScrollView>
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
@@ -88,66 +111,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.xl,
-    paddingBottom: spacing.xxxl,
-  },
-  errorBox: {
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-  },
-  errorText: {
-    color: colors.danger,
-    fontSize: 14,
-  },
-  loadingBox: {
-    marginTop: spacing.lg,
-    padding: spacing.xl,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: colors.text,
-    fontSize: 16,
-  },
-  summary: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  summaryLabel: {
-    color: colors.textMuted,
-    fontSize: 14,
-  },
-  summaryValue: {
-    color: colors.primarySoft,
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  metaGrid: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  metaBox: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
   },
-  metaLabel: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginBottom: spacing.xs,
+  contentContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
   },
-  metaValue: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-});
+})
